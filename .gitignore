@@ -1,3 +1,5 @@
 a.out
+check_victory.o
 main.o
+is_full.o
 .vscode
