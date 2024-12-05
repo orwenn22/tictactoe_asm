@@ -1,4 +1,6 @@
-    .global _start
+    .global _start      # We want the entry point to be exposed to the linker
+    .global grid_data   # The grid is accessed by the check_victory function, so expose it to the public too
+
 
     .text   # program section (r)
 
@@ -90,17 +92,28 @@ _update_grid_string_loop_next:
     ret
 
 
-
-_start:
-    call reinitialize
-
-prompt:
+display_grid:
     # write(stdout, grid_message, len(grid_message))
     mov     $1, %rax                                                # 1 : sys_write
     mov     $1, %rdi                                                # 1 : stdout
     mov     $grid_message, %rsi                                     # address of grid message
     mov     $(grid_message_end-grid_message), %rdx                  # length
     syscall
+    ret
+
+
+_start:
+    # write(stdout, separator_text, len(separator_text))
+    mov     $1, %rax                                                # 1 : sys_write
+    mov     $1, %rdi                                                # 1 : stdout
+    mov     $separator_text, %rsi                                   # address of separator
+    mov     $(separator_text_end-separator_text), %rdx              # length
+    syscall
+
+    call reinitialize
+
+prompt:
+    call display_grid
 
     # write(stdout, number_prompt, len(number_prompt))
     mov     $1, %rax                                                # 1 : sys_write
@@ -114,7 +127,7 @@ prompt:
     mov     $0, %rdi                                                # 0 : stdin
     mov     $user_in, %rsi                                          # address of user_in
     mov     $1, %rdx                                                # length
-    syscall  
+    syscall
 
     movb    user_in, %al
     cmpb $'\n', %al                                                 # If the user enter an empty line then we don't need to flush
@@ -153,9 +166,59 @@ _give_turn_to_p2:
 
 
 _check_victory:
-    # TODO : check victory lmao
+    call check_victory      # After calling this, rax contains the winner of the game if there is one (0 : no winner, 1 : player 1 won, 2 : player 2 won)
+    cmp     $1, %rax        # player 1 won
+    je _p1_won
+    cmp     $2, %rax        # player 2 won
+    je _p2_won
+    jmp _check_full         # no winners yet
 
+
+
+_check_full:
+    call is_full            # Check if the grid is full (store result in rax)
+    cmp     $1, %rax
+    je _no_winner           # If so end the game
     jmp prompt
+
+
+_p1_won:
+    call display_grid
+    # write(stdout, player_1_won_message, len(player_1_won_message))
+    mov     $1, %rax                                                # 1 : sys_write
+    mov     $1, %rdi                                                # 1 : stdout
+    mov     $player_1_won_message, %rsi                             # address of message
+    mov     $(player_1_won_message_end-player_1_won_message), %rdx  # length
+    syscall
+    jmp _ask_replay
+
+
+_p2_won:
+    call display_grid
+    # write(stdout, player_2_won_message, len(player_2_won_message))
+    mov     $1, %rax                                                # 1 : sys_write
+    mov     $1, %rdi                                                # 1 : stdout
+    mov     $player_2_won_message, %rsi                             # address of message
+    mov     $(player_2_won_message_end-player_2_won_message), %rdx  # length
+    syscall
+    jmp _ask_replay
+
+
+_no_winner:
+    call display_grid
+    # write(stdout, no_winner_message, len(no_winner_message))
+    mov     $1, %rax                                                # 1 : sys_write
+    mov     $1, %rdi                                                # 1 : stdout
+    mov     $no_winner_message, %rsi                                # address of message
+    mov     $(no_winner_message_end-no_winner_message), %rdx        # length
+    syscall
+    jmp _ask_replay
+
+
+_ask_replay:
+    # TODO : actually ask if we want to replay ?
+    # jmp _prog_exit
+    jmp _start
 
 
 _prog_exit:
@@ -165,6 +228,9 @@ _prog_exit:
     syscall
 
 
+separator_text:
+    .ascii "======================\n"
+separator_text_end:
 
 number_prompt:
     .ascii  "Enter a number : "
@@ -175,6 +241,21 @@ grid_message_original:
     .ascii "1|2|3\n-----\n4|5|6\n-----\n7|8|9\n"
 grid_message_original_end:
 
+player_1_won_message:
+    .ascii "Player 1 won\n"
+player_1_won_message_end:
+
+player_2_won_message:
+    .ascii "Player 2 won\n"
+player_2_won_message_end:
+
+no_winner_message:
+    .ascii "No one won :(\n"
+no_winner_message_end:
+
+debug_message:
+    .ascii "debug print\n"
+debug_message_end:
 
 
     .data   # r/w memory section
